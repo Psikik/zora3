@@ -2,38 +2,31 @@
 
 ## Current State
 
-The project has Ralph automation infrastructure, a core spec (`specs/core.md`), and
-architectural guidelines (`AGENTS.md`) but **zero application code**. No Python files,
-no tests, no `pyproject.toml`, no test fixtures exist yet.
+Priority 1 (Project Skeleton) and Priority 2 (Domain Models) are **complete**. The project
+has a working `pyproject.toml`, package structure, CLI entry points (`zora` and `python -m zora`),
+domain models with full test coverage (18 tests passing), and all validation passes.
 
-## Priority 1 — Project Skeleton
+### Implemented
 
-These items establish the foundation everything else depends on.
+- `pyproject.toml` — Python 3.12+, hatchling build, `zora` CLI entry point, deps: numpy, opencv-python-headless; dev: ruff, pytest
+- `src/zora/` — package with `__init__.py`, `__main__.py`, `cli.py`
+- `src/zora/models/` — `Ship`, `Assignment`, `Campaign`, `BoardState` dataclasses with `to_dict()` serialization
+- `src/zora/capture/__init__.py`, `src/zora/vision/__init__.py` — empty subpackage stubs
+- `tests/test_models.py` — 18 unit tests covering construction, defaults, serialization, mutable default isolation
+- Assignment model includes spec milestone 1 fields: `duration`, `rarity`, `event_rewards` (beyond original plan)
 
-- [ ] Create `pyproject.toml` with project metadata, Python 3.12+ requirement, `[project.scripts]` entry point for `zora` CLI, dev dependencies (ruff, pytest), and runtime dependencies (numpy, opencv-python-headless, pytesseract or other OCR library)
-- [ ] Create package structure: `src/zora/__init__.py`, `src/zora/capture/__init__.py`, `src/zora/vision/__init__.py`, `src/zora/models/__init__.py`
-- [ ] Create `src/zora/__main__.py` so `python -m zora` works
-- [ ] Create minimal `src/zora/cli.py` entry point wired to `[project.scripts]`
-- [ ] Create `tests/__init__.py` and `tests/fixtures/.gitkeep`
-- [ ] Verify `uv sync`, `uv run ruff check`, `uv run ruff format --check`, and `uv run pytest` all pass on the empty skeleton
+### Key Decisions
 
-## Priority 2 — Domain Models
-
-Dataclasses in `src/zora/models/` matching the spec's domain concepts.
-
-- [ ] `src/zora/models/ship.py` — `Ship` dataclass with fields: `name: str`, `engineering: int`, `science: int`, `tactical: int`, `maintenance: bool` (True = on cooldown), `special_abilities: list[str]` (default empty)
-- [ ] `src/zora/models/assignment.py` — `Assignment` dataclass with fields: `name: str`, `engineering: int`, `science: int`, `tactical: int`, `ship_slots: int`, `campaign: str`
-- [ ] `src/zora/models/campaign.py` — `Campaign` dataclass with fields: `name: str` (and potentially progress/rewards later, but spec only requires name for milestone 1)
-- [ ] `src/zora/models/board.py` — `BoardState` dataclass aggregating assignments and ships read from the board (the structured output the spec requires)
-- [ ] Re-export models from `src/zora/models/__init__.py`
-- [ ] Unit tests for model construction and field defaults in `tests/test_models.py`
+- **No argparse yet** in CLI — will be added when the pipeline is wired (Priority 6)
+- **Python 3.13.7** is the runtime (3.12+ in pyproject.toml)
+- **hatchling** build backend with `src/` layout
 
 ## Priority 3 — Screen Capture
 
 `src/zora/capture/` — isolated behind a simple interface so tests can inject fixture images.
 
 - [ ] Define a capture interface/protocol: a callable or protocol class that returns a numpy array (BGR image)
-- [ ] Implement `src/zora/capture/screenshot.py` — concrete implementation using a screenshot library (e.g., mss, pyautogui, or platform-specific) to capture the STO game window
+- [ ] Implement `src/zora/capture/screenshot.py` — concrete implementation using a screenshot library (e.g., mss) to capture the STO game window
 - [ ] Implement `src/zora/capture/file.py` — a file-based implementation that loads an image from disk (for testing and development without a live game)
 - [ ] Tests for the file-based capture using a small fixture image in `tests/fixtures/`
 
@@ -59,10 +52,10 @@ Reading text and numbers from detected regions.
 
 Wire everything together.
 
-- [ ] `src/zora/cli.py` — full CLI that captures → detects → extracts → outputs structured data (JSON or similar)
-- [ ] `src/zora/pipeline.py` (or similar) — orchestration function: capture image → detect board → extract assignments → extract ships → return `BoardState`
+- [ ] `src/zora/cli.py` — full CLI with argparse (--image flag) that captures → detects → extracts → outputs structured data
+- [ ] `src/zora/pipeline.py` — orchestration function: capture image → detect board → extract assignments → return `BoardState`
 - [ ] End-to-end test using fixture image → expected `BoardState`
-- [ ] Structured output format (JSON to stdout, matching spec requirement 5)
+- [ ] Structured output format (JSON to stdout, matching spec requirement 4)
 
 ## Notes
 
