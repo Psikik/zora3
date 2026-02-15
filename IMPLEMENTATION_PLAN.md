@@ -2,58 +2,51 @@
 
 ## Current State
 
-Priorities 1–3 are **complete** (26 tests passing, all validation green).
+**Milestone 1 is functionally complete.** All six priorities are implemented with 56 tests passing and all validation green. The system can:
+1. Capture a screenshot (from file or live screen)
+2. Detect the admiralty board region via color-based segmentation
+3. Find individual assignment card sub-regions within the board
+4. Extract assignment details via Tesseract OCR (name, stats, slots, duration, rarity)
+5. Output structured JSON to stdout
 
 ### Implemented
 
-- `pyproject.toml` — Python 3.12+, hatchling build, `zora` CLI entry point, deps: numpy, opencv-python-headless; dev: ruff, pytest
-- `src/zora/` — package with `__init__.py`, `__main__.py`, `cli.py`
-- `src/zora/models/` — `Ship`, `Assignment`, `Campaign`, `BoardState` dataclasses with `to_dict()` serialization. Assignment includes milestone 1 fields: `duration`, `rarity`, `event_rewards`.
-- `src/zora/capture/` — `CaptureSource` protocol (callable → BGR numpy array), `FileCapture` (loads from disk), `ScreenshotCapture` (mss-based live capture, lazy import)
-- `tests/test_models.py` — 18 model tests; `tests/test_capture.py` — 8 capture tests
-- `tests/fixtures/test_capture.png` — synthetic 100x200 BGR test image
+- `pyproject.toml` — Python 3.12+, hatchling build, `zora` CLI entry point, deps: numpy, opencv-python-headless, pytesseract; dev: ruff, pytest
+- `src/zora/cli.py` — argparse CLI with `--image`, `--verbose`, `--version` flags; outputs JSON
+- `src/zora/pipeline.py` — orchestration: capture → detect board → find cards → extract assignments → BoardState
+- `src/zora/models/` — `Ship`, `Assignment`, `Campaign`, `BoardState` dataclasses with `to_dict()`
+- `src/zora/capture/` — `CaptureSource` protocol, `FileCapture`, `ScreenshotCapture` (mss, lazy)
+- `src/zora/vision/detect.py` — HSV-based board region detection with morphological cleanup
+- `src/zora/vision/regions.py` — HSV-based card region detection within board, sorted by position
+- `src/zora/vision/extract.py` — Tesseract OCR with preprocessing (GaussianBlur + OTSU), text parsing for stats/duration/rarity
+- `src/zora/vision/__init__.py` — `BoundingBox` frozen dataclass
+- 56 tests across 6 test files; synthetic fixtures in `tests/fixtures/`
 
 ### Key Decisions
 
-- **No argparse yet** in CLI — will be added when the pipeline is wired (Priority 6)
-- **Python 3.13.7** is the runtime (3.12+ in pyproject.toml)
-- **hatchling** build backend with `src/` layout
-- **mss** used for screenshot capture (lazy-imported to avoid failures in headless envs)
-- **CaptureSource** is a `Protocol` — any callable returning `BGRImage` satisfies it
-- **BGRImage** type alias = `NDArray[np.uint8]` defined in `capture/__init__.py`
+- **Python 3.13.7** runtime (3.12+ in pyproject.toml), **hatchling** build backend
+- **Tesseract 5.5.0** for OCR via pytesseract; `--oem 3 --psm 6` for block text, `--psm 7` for digits
+- **GaussianBlur + OTSU** threshold instead of adaptiveThreshold (crashes on ARM/aarch64 with opencv-python-headless)
+- **CaptureSource** is a `Protocol` — any callable returning `BGRImage` (NDArray[np.uint8]) satisfies it
+- **mss** lazy-imported in ScreenshotCapture to avoid failures in headless environments
+- **HSV color ranges**: board bg [0,0,10]–[180,120,60], card bg [0,0,80]–[180,100,200]
 
-## Priority 4 — Vision: Board Detection
+## Known Limitations
 
-`src/zora/vision/` — locate the admiralty board UI within a screenshot.
+- **OCR accuracy with synthetic text** is approximate — OpenCV's `putText` renders differently from STO's game font. Real screenshots may need HSV range tuning and OCR config adjustments.
+- **No real STO screenshots** yet. The synthetic fixtures validate the pipeline architecture but calibration against real game UI is pending.
+- **Science stat extraction** is inconsistent with synthetic images — the OCR sometimes misses "Sci:" text. Works well with the text parser when OCR output is clean.
 
-- [ ] `src/zora/vision/detect.py` — function(s) to locate the admiralty board region within a full screenshot, returning bounding box coordinates or a cropped image
-- [ ] `src/zora/vision/regions.py` — functions to identify sub-regions within the board: assignment cards, ship card slots, campaign indicator, stat areas
-- [ ] Golden screenshot fixtures in `tests/fixtures/` for board detection tests
-- [ ] Tests for board detection using fixture screenshots
+## Future Work
 
-## Priority 5 — Vision: Data Extraction (OCR)
-
-Reading text and numbers from detected regions.
-
-- [ ] `src/zora/vision/extract.py` — functions to extract assignment data from detected assignment regions (name, eng/sci/tac stats, ship slots, campaign)
-- [ ] `src/zora/vision/extract.py` — functions to extract ship card data from detected ship regions (name, eng/sci/tac stats, maintenance status)
-- [ ] OCR configuration tuned for STO's UI font/colors
-- [ ] Tests for extraction accuracy against golden fixtures with known expected values
-
-## Priority 6 — End-to-End Pipeline & CLI
-
-Wire everything together.
-
-- [ ] `src/zora/cli.py` — full CLI with argparse (--image flag) that captures → detects → extracts → outputs structured data
-- [ ] `src/zora/pipeline.py` — orchestration function: capture image → detect board → extract assignments → return `BoardState`
-- [ ] End-to-end test using fixture image → expected `BoardState`
-- [ ] Structured output format (JSON to stdout, matching spec requirement 4)
+- [ ] **Real screenshot calibration**: capture actual STO admiralty board screenshots, adjust HSV ranges and OCR config
+- [ ] **Ship roster reading**: milestone 2 per spec — separate screen from assignments
+- [ ] **Critical Success computation**: derive from ship stats vs assignment requirements (pure model logic)
+- [ ] **mss dependency**: add as optional dependency for live capture environments
+- [ ] **OCR alternatives**: evaluate EasyOCR or PaddleOCR if Tesseract accuracy is poor on real STO fonts
 
 ## Notes
 
-- **OCR library choice**: pytesseract (Tesseract wrapper) is the most common Python OCR option. EasyOCR or PaddleOCR are alternatives if Tesseract accuracy is poor on STO's UI. Decision should be made during Priority 5 based on testing with actual screenshots.
-- **opencv-python-headless** preferred over opencv-python to avoid unnecessary GUI dependencies in the container.
-- **Vision architecture**: per AGENTS.md, detection (finding regions) and extraction (reading data) must be kept separate. `detect.py`/`regions.py` handle detection; `extract.py` handles reading.
-- **Test fixtures**: golden screenshots of the STO admiralty board are needed. These should be committed to `tests/fixtures/` and paired with expected output files or inline expected values in tests.
-- **Critical Success**: mentioned in the spec's domain concepts but not in the milestone 1 requirements. It may be computed from Ship stats vs Assignment requirements — this is a derived value, not something to extract from the screen. Can be deferred or implemented as a simple utility function on the models.
-- **mss not in dependencies**: `mss` is used as a lazy import in `ScreenshotCapture`. It should be added as an optional dependency if live capture is needed. Currently not required for testing.
+- **adaptiveThreshold crashes** on aarch64 with opencv-python-headless 4.13 — use GaussianBlur + OTSU as workaround
+- **Tesseract must be system-installed** (`apt-get install tesseract-ocr`) — pytesseract is just a wrapper
+- **Vision architecture**: detection (detect.py/regions.py) and extraction (extract.py) are strictly separated per AGENTS.md

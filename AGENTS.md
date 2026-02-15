@@ -15,11 +15,16 @@ zora/
 └── pyproject.toml
 ```
 
+## Prerequisites
+
+Tesseract OCR must be system-installed: `sudo apt-get install tesseract-ocr`
+
 ## Build & Run
 
 ```bash
 uv sync                          # Install dependencies
-uv run zora                      # Run the tool
+uv run zora                      # Run the tool (empty board)
+uv run zora --image <path.png>   # Read assignments from screenshot
 uv run python -m zora             # Alternative entry point
 ```
 
