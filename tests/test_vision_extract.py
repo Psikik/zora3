@@ -1,7 +1,10 @@
 """Tests for data extraction (vision.extract module)."""
 
+import shutil
+
 import cv2
 import numpy as np
+import pytest
 
 from zora.capture import BGRImage
 from zora.vision.extract import (
@@ -10,6 +13,11 @@ from zora.vision.extract import (
     ocr_text,
     parse_assignment_text,
     preprocess_for_ocr,
+)
+
+requires_tesseract = pytest.mark.skipif(
+    shutil.which("tesseract") is None,
+    reason="Tesseract OCR binary not installed",
 )
 
 
@@ -86,8 +94,34 @@ Common"""
             result = parse_assignment_text(text)
             assert result["duration"] == expected, f"Failed for input {text!r}"
 
+    def test_parses_event_rewards_line(self) -> None:
+        """Extracts event rewards from a labeled reward line."""
+        text = "Mission\nEng: 30\nReward: 500 Dilithium, 100 Marks"
+        result = parse_assignment_text(text)
+        assert result["event_rewards"] == ["500 Dilithium", "100 Marks"]
+
+    def test_parses_standalone_reward_items(self) -> None:
+        """Detects standalone reward items like '100 Dilithium'."""
+        text = "Mission\nEng: 30\n100 Dilithium\n50 XP"
+        result = parse_assignment_text(text)
+        assert "100 Dilithium" in result["event_rewards"]
+        assert "50 XP" in result["event_rewards"]
+
+    def test_no_event_rewards_returns_empty(self) -> None:
+        """When no reward text is present, event_rewards is empty."""
+        text = "Mission\nEng: 30\nSci: 20"
+        result = parse_assignment_text(text)
+        assert result["event_rewards"] == []
+
+    def test_parses_event_rewards_prefix(self) -> None:
+        """Handles 'Event Rewards:' prefix."""
+        text = "Mission\nEvent Rewards: 200 Marks"
+        result = parse_assignment_text(text)
+        assert result["event_rewards"] == ["200 Marks"]
+
 
 class TestOcrText:
+    @requires_tesseract
     def test_reads_clear_text(self) -> None:
         """OCR reads clear white text on black background."""
         image = np.zeros((60, 300, 3), dtype=np.uint8)
@@ -103,6 +137,7 @@ class TestOcrText:
         text = ocr_text(image)
         assert "Hello" in text or "hello" in text.lower()
 
+    @requires_tesseract
     def test_reads_numbers(self) -> None:
         """OCR reads numbers from an image."""
         image = np.zeros((60, 200, 3), dtype=np.uint8)
@@ -121,6 +156,7 @@ class TestOcrText:
 
 
 class TestOcrNumber:
+    @requires_tesseract
     def test_extracts_number(self) -> None:
         """Extracts a single number from an image."""
         image = np.zeros((60, 120, 3), dtype=np.uint8)
@@ -139,6 +175,7 @@ class TestOcrNumber:
 
 
 class TestExtractAssignment:
+    @requires_tesseract
     def test_returns_assignment_object(self, single_card_image: BGRImage) -> None:
         """Extracting from a card image returns an Assignment."""
         assignment = extract_assignment(single_card_image)

@@ -9,6 +9,9 @@ dependencies = [
     "pytesseract>=0.3.13",
 ]
 
+[project.optional-dependencies]
+capture = ["mss"]
+
 [project.scripts]
 zora = "zora.cli:main"
 

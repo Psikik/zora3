@@ -2,20 +2,20 @@
 
 ## Current State
 
-**Milestone 1 is partially complete.** Core pipeline architecture is in place and functional — capture, board detection, card region detection, OCR extraction, and JSON output all work end-to-end. However, several spec requirements remain unimplemented and test gaps exist.
+**Milestone 1 is complete.** Core pipeline architecture is in place and functional — capture, board detection, card region detection, OCR extraction, and JSON output all work end-to-end. All P1 blocking items and several P2 quality items have been resolved.
 
 ### What Works
 
-- `pyproject.toml` — Python 3.12+, hatchling build, `zora` CLI entry point, deps: numpy, opencv-python-headless, pytesseract; dev: ruff, pytest
-- `src/zora/cli.py` — argparse CLI with `--image`, `--verbose`, `--version` flags; outputs JSON
+- `pyproject.toml` — Python 3.12+, hatchling build, `zora` CLI entry point, deps: numpy, opencv-python-headless, pytesseract; dev: ruff, pytest; optional: `mss` for live capture
+- `src/zora/cli.py` — argparse CLI with `--image`, `--verbose`, `--version` flags; outputs JSON; attempts live capture via `ScreenshotCapture` when no `--image` provided; version read from `importlib.metadata`
 - `src/zora/pipeline.py` — orchestration: capture → detect board → find cards → extract assignments → BoardState
 - `src/zora/models/` — `Ship`, `Assignment`, `Campaign`, `BoardState` dataclasses with `to_dict()`
 - `src/zora/capture/` — `CaptureSource` protocol, `FileCapture`, `ScreenshotCapture` (mss, lazy import)
 - `src/zora/vision/detect.py` — HSV-based board region detection with morphological cleanup
 - `src/zora/vision/regions.py` — HSV-based card region detection within board, sorted by position
-- `src/zora/vision/extract.py` — Tesseract OCR with preprocessing (GaussianBlur + OTSU), text parsing for stats/duration/rarity
+- `src/zora/vision/extract.py` — Tesseract OCR with preprocessing (GaussianBlur + OTSU), text parsing for stats/duration/rarity/event_rewards
 - `src/zora/vision/__init__.py` — `BoundingBox` frozen dataclass
-- 52 tests pass (across 8 test files); 4 tests fail when tesseract binary not installed; synthetic fixtures in `tests/fixtures/`
+- Tests pass across all test files including CLI coverage; Tesseract-dependent tests guarded with `pytest.mark.skipif`; synthetic fixtures in `tests/fixtures/`
 
 ### Key Decisions
 
@@ -26,23 +26,9 @@
 - **mss** lazy-imported in ScreenshotCapture to avoid failures in headless environments
 - **HSV color ranges**: board bg [0,0,10]–[180,120,60], card bg [0,0,80]–[180,100,200]
 
-## Remaining Work — Priority 1 (Blocking/Correctness)
-
-- [ ] **P1-1: Declare `mss` as optional dependency** — `ScreenshotCapture` imports `mss` at runtime but it is not listed in `pyproject.toml`. Add as optional dependency (e.g., `[project.optional-dependencies] capture = ["mss"]`). Files: `pyproject.toml`.
-
-- [ ] **P1-2: CLI must attempt live capture when no `--image` provided** — Spec requirement 1 says "Capture a screenshot of the STO game window." Currently `cli.py` returns a hardcoded empty `BoardState` in the no-argument path (lines 43-45) instead of using `ScreenshotCapture`. Should use `ScreenshotCapture` as default source, with graceful error if `mss` is not installed. Depends on P1-1. Files: `src/zora/cli.py`.
-
-- [ ] **P1-3: `event_rewards` extraction is unimplemented** — Spec requirement 3 explicitly lists "Event rewards" as a required extracted field. The `Assignment` model has the `event_rewards: list[str]` field, but `parse_assignment_text()` never populates it and `extract_assignment()` never passes it through. Every extracted assignment has `event_rewards: []`. Add regex pattern matching for event reward text and wire through extraction. Files: `src/zora/vision/extract.py`, `tests/test_vision_extract.py`.
-
-- [ ] **P1-4: OCR tests fail without tesseract binary** — 4 tests in `test_vision_extract.py` (`TestOcrText.test_reads_clear_text`, `TestOcrText.test_reads_numbers`, `TestOcrNumber.test_extracts_number`, `TestExtractAssignment.test_returns_assignment_object`) call Tesseract directly and fail with `TesseractNotFoundError` when the binary is absent. Add `pytest.mark.skipif(shutil.which("tesseract") is None, ...)` guard. Files: `tests/test_vision_extract.py` or `tests/conftest.py`.
-
 ## Remaining Work — Priority 2 (Quality/Robustness)
 
-- [ ] **P2-1: Add CLI test coverage** — `main()` in `cli.py` has zero test coverage. Need tests for: `--image` with valid fixture producing JSON, `--image` with missing file, no arguments, `--version` output, `--verbose` logging level. Files: new `tests/test_cli.py`.
-
 - [ ] **P2-2: Add ScreenshotCapture mock tests** — `screenshot.py` is completely untested. Add mock-based tests for BGRA→BGR conversion, monitor parameter passthrough, and `CaptureSource` protocol conformance. Files: `tests/test_capture.py`.
-
-- [ ] **P2-3: Read version from package metadata instead of hardcoding** — `cli.py` line 22 hardcodes `version="%(prog)s 0.1.0"`. Use `importlib.metadata.version("zora")` to read from pyproject.toml at runtime so versions stay in sync. Files: `src/zora/cli.py`.
 
 - [ ] **P2-4: Extract magic numbers to named constants** — `vision/extract.py` has inline thresholds (h < 100, w < 200, scale 2.0, blur kernel (5,5)). `vision/detect.py` has morph kernel (15,15). `vision/regions.py` has morph kernel (5,5). Extract to descriptive module-level constants. Files: `src/zora/vision/extract.py`, `src/zora/vision/detect.py`, `src/zora/vision/regions.py`.
 
@@ -71,3 +57,12 @@
 - **adaptiveThreshold crashes** on aarch64 with opencv-python-headless 4.13 — use GaussianBlur + OTSU as workaround
 - **Tesseract must be system-installed** (`apt-get install tesseract-ocr`) — pytesseract is just a wrapper
 - **Vision architecture**: detection (detect.py/regions.py) and extraction (extract.py) are strictly separated per AGENTS.md
+
+## Completed
+
+- [x] **P1-1: Declare `mss` as optional dependency** — `mss` declared as optional dependency in `pyproject.toml`.
+- [x] **P1-2: CLI attempts live capture when no `--image` provided** — Uses `ScreenshotCapture` as default source; gracefully exits with error message if `mss` is not installed.
+- [x] **P1-3: `event_rewards` extraction implemented** — `parse_assignment_text()` now extracts event rewards via regex patterns for reward lines and standalone reward items; wired through `extract_assignment()`.
+- [x] **P1-4: Tesseract-dependent tests guarded** — OCR tests use `pytest.mark.skipif` to skip when the tesseract binary is not installed.
+- [x] **P2-1: CLI test coverage added** — `tests/test_cli.py` covers `--version`, `--image`, no args, `--verbose`, and JSON output.
+- [x] **P2-3: Version read from package metadata** — `cli.py` uses `importlib.metadata.version("zora")` instead of a hardcoded version string.

@@ -1,13 +1,21 @@
 """Command-line entry point for Zora."""
 
 import argparse
+import importlib.metadata
 import json
 import logging
 import sys
 
 from zora.capture.file import FileCapture
-from zora.models import BoardState
 from zora.pipeline import read_board
+
+
+def _get_version() -> str:
+    """Read the package version from installed metadata."""
+    try:
+        return importlib.metadata.version("zora")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0"
 
 
 def main() -> None:
@@ -19,7 +27,7 @@ def main() -> None:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.1.0",
+        version=f"%(prog)s {_get_version()}",
     )
     parser.add_argument(
         "--image",
@@ -39,10 +47,19 @@ def main() -> None:
 
     if args.image:
         source = FileCapture(args.image)
-        board = read_board(source)
     else:
-        # No image provided — output empty board
-        board = BoardState(assignments=[], ships=[])
+        try:
+            from zora.capture.screenshot import ScreenshotCapture
 
+            source = ScreenshotCapture()
+        except ImportError:
+            print(
+                "Error: Live capture requires the 'mss' package. "
+                "Install it with: pip install zora[capture]",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    board = read_board(source)
     json.dump(board.to_dict(), sys.stdout, indent=2)
     sys.stdout.write("\n")

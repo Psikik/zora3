@@ -91,6 +91,7 @@ def parse_assignment_text(raw_text: str) -> dict:
         "ship_slots": 0,
         "duration": "",
         "rarity": "",
+        "event_rewards": [],
     }
 
     if not lines:
@@ -131,6 +132,34 @@ def parse_assignment_text(raw_text: str) -> dict:
             result["rarity"] = rarity.title()
             break
 
+    # Event rewards — look for lines containing reward-related keywords
+    # STO event rewards appear as "Event: <reward name>" or "Reward: <name>"
+    # or lines mentioning specific reward types like dilithium, marks, XP, etc.
+    rewards: list[str] = []
+    reward_line_pat = re.compile(
+        r"(?:event\s*rewards?|rewards?)\s*[:\-]\s*(.+)", re.IGNORECASE
+    )
+    reward_item_pat = re.compile(
+        r"(\d+[x×]?\s*(?:dilithium|dil|marks?|xp|experience|ec|energy credits"
+        r"|fleet credits|admiralty xp|campaign xp|tour of duty|"
+        r"r&d materials?|reputation marks?))",
+        re.IGNORECASE,
+    )
+    for line in lines:
+        line_match = reward_line_pat.search(line)
+        if line_match:
+            # Split comma-separated rewards on a single reward line
+            reward_text = line_match.group(1).strip()
+            for part in re.split(r"[,;]", reward_text):
+                part = part.strip()
+                if part:
+                    rewards.append(part)
+        else:
+            # Also check for standalone reward item patterns
+            for item_match in reward_item_pat.finditer(line):
+                rewards.append(item_match.group(1).strip())
+    result["event_rewards"] = rewards
+
     return result
 
 
@@ -154,4 +183,5 @@ def extract_assignment(card_image: BGRImage) -> Assignment:
         ship_slots=fields["ship_slots"],
         duration=fields["duration"],
         rarity=fields["rarity"],
+        event_rewards=fields["event_rewards"],
     )
