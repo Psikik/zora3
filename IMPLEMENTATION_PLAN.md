@@ -2,33 +2,25 @@
 
 ## Current State
 
-Priority 1 (Project Skeleton) and Priority 2 (Domain Models) are **complete**. The project
-has a working `pyproject.toml`, package structure, CLI entry points (`zora` and `python -m zora`),
-domain models with full test coverage (18 tests passing), and all validation passes.
+Priorities 1–3 are **complete** (26 tests passing, all validation green).
 
 ### Implemented
 
 - `pyproject.toml` — Python 3.12+, hatchling build, `zora` CLI entry point, deps: numpy, opencv-python-headless; dev: ruff, pytest
 - `src/zora/` — package with `__init__.py`, `__main__.py`, `cli.py`
-- `src/zora/models/` — `Ship`, `Assignment`, `Campaign`, `BoardState` dataclasses with `to_dict()` serialization
-- `src/zora/capture/__init__.py`, `src/zora/vision/__init__.py` — empty subpackage stubs
-- `tests/test_models.py` — 18 unit tests covering construction, defaults, serialization, mutable default isolation
-- Assignment model includes spec milestone 1 fields: `duration`, `rarity`, `event_rewards` (beyond original plan)
+- `src/zora/models/` — `Ship`, `Assignment`, `Campaign`, `BoardState` dataclasses with `to_dict()` serialization. Assignment includes milestone 1 fields: `duration`, `rarity`, `event_rewards`.
+- `src/zora/capture/` — `CaptureSource` protocol (callable → BGR numpy array), `FileCapture` (loads from disk), `ScreenshotCapture` (mss-based live capture, lazy import)
+- `tests/test_models.py` — 18 model tests; `tests/test_capture.py` — 8 capture tests
+- `tests/fixtures/test_capture.png` — synthetic 100x200 BGR test image
 
 ### Key Decisions
 
 - **No argparse yet** in CLI — will be added when the pipeline is wired (Priority 6)
 - **Python 3.13.7** is the runtime (3.12+ in pyproject.toml)
 - **hatchling** build backend with `src/` layout
-
-## Priority 3 — Screen Capture
-
-`src/zora/capture/` — isolated behind a simple interface so tests can inject fixture images.
-
-- [ ] Define a capture interface/protocol: a callable or protocol class that returns a numpy array (BGR image)
-- [ ] Implement `src/zora/capture/screenshot.py` — concrete implementation using a screenshot library (e.g., mss) to capture the STO game window
-- [ ] Implement `src/zora/capture/file.py` — a file-based implementation that loads an image from disk (for testing and development without a live game)
-- [ ] Tests for the file-based capture using a small fixture image in `tests/fixtures/`
+- **mss** used for screenshot capture (lazy-imported to avoid failures in headless envs)
+- **CaptureSource** is a `Protocol` — any callable returning `BGRImage` satisfies it
+- **BGRImage** type alias = `NDArray[np.uint8]` defined in `capture/__init__.py`
 
 ## Priority 4 — Vision: Board Detection
 
@@ -64,3 +56,4 @@ Wire everything together.
 - **Vision architecture**: per AGENTS.md, detection (finding regions) and extraction (reading data) must be kept separate. `detect.py`/`regions.py` handle detection; `extract.py` handles reading.
 - **Test fixtures**: golden screenshots of the STO admiralty board are needed. These should be committed to `tests/fixtures/` and paired with expected output files or inline expected values in tests.
 - **Critical Success**: mentioned in the spec's domain concepts but not in the milestone 1 requirements. It may be computed from Ship stats vs Assignment requirements — this is a derived value, not something to extract from the screen. Can be deferred or implemented as a simple utility function on the models.
+- **mss not in dependencies**: `mss` is used as a lazy import in `ScreenshotCapture`. It should be added as an optional dependency if live capture is needed. Currently not required for testing.
