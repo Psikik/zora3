@@ -133,6 +133,7 @@ class TestBoardState:
         board = BoardState()
         assert board.assignments == []
         assert board.ships == []
+        assert board.errors == []
 
     def test_board_with_data(self) -> None:
         ship = Ship(name="Enterprise", engineering=50, science=30, tactical=40)
@@ -154,11 +155,13 @@ class TestBoardState:
         assert len(d["ships"]) == 1
         assert d["assignments"][0]["name"] == "Patrol"
         assert d["ships"][0]["name"] == "Enterprise"
+        assert "errors" not in d
 
     def test_to_dict_empty(self) -> None:
         board = BoardState()
         d = board.to_dict()
         assert d == {"assignments": [], "ships": []}
+        assert "errors" not in d
 
     def test_lists_default_not_shared(self) -> None:
         """Each BoardState instance gets its own lists."""
@@ -168,6 +171,25 @@ class TestBoardState:
             Assignment(name="X", engineering=0, science=0, tactical=0, ship_slots=1)
         )
         assert b2.assignments == []
+
+    def test_errors_field(self) -> None:
+        """Errors appear in to_dict() when present."""
+        board = BoardState(
+            errors=["Failed to extract card 0", "Failed to extract card 2"]
+        )
+        d = board.to_dict()
+        assert "errors" in d
+        assert d["errors"] == [
+            "Failed to extract card 0",
+            "Failed to extract card 2",
+        ]
+
+    def test_errors_default_not_shared(self) -> None:
+        """Each BoardState instance gets its own errors list."""
+        b1 = BoardState()
+        b2 = BoardState()
+        b1.errors.append("test error")
+        assert b2.errors == []
 
 
 class TestModelImports:

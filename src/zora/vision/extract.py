@@ -23,6 +23,14 @@ TESSERACT_CONFIG = "--oem 3 --psm 6"
 # For reading individual numbers/stats
 TESSERACT_DIGITS_CONFIG = "--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789"
 
+# Minimum image dimensions for OCR — smaller images are upscaled
+MIN_OCR_HEIGHT = 100
+MIN_OCR_WIDTH = 200
+# Minimum upscale factor when image is below dimension thresholds
+MIN_UPSCALE_FACTOR = 2.0
+# Gaussian blur kernel size for noise reduction before thresholding
+BLUR_KERNEL_SIZE = (5, 5)
+
 
 def preprocess_for_ocr(image: BGRImage) -> BGRImage:
     """Preprocess a card image for better OCR accuracy.
@@ -34,12 +42,12 @@ def preprocess_for_ocr(image: BGRImage) -> BGRImage:
 
     # Scale up if the image is small — Tesseract works better on larger text
     h, w = gray.shape
-    if h < 100 or w < 200:
-        scale = max(200 / w, 100 / h, 2.0)
+    if h < MIN_OCR_HEIGHT or w < MIN_OCR_WIDTH:
+        scale = max(MIN_OCR_WIDTH / w, MIN_OCR_HEIGHT / h, MIN_UPSCALE_FACTOR)
         gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
     # Blur to reduce noise, then apply OTSU threshold for clean binary output
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    blurred = cv2.GaussianBlur(gray, BLUR_KERNEL_SIZE, 0)
     _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     return binary

@@ -61,5 +61,11 @@ def main() -> None:
             sys.exit(1)
 
     board = read_board(source)
+    if board.errors:
+        print(
+            f"Warning: {len(board.errors)} card(s) failed extraction. "
+            "Use --verbose for details.",
+            file=sys.stderr,
+        )
     json.dump(board.to_dict(), sys.stdout, indent=2)
     sys.stdout.write("\n")

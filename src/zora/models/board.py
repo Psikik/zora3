@@ -16,10 +16,14 @@ class BoardState:
 
     assignments: list[Assignment] = field(default_factory=list)
     ships: list[Ship] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Serialize to a plain dict for JSON output."""
-        return {
+        result = {
             "assignments": [a.to_dict() for a in self.assignments],
             "ships": [s.to_dict() for s in self.ships],
         }
+        if self.errors:
+            result["errors"] = self.errors
+        return result

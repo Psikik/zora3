@@ -21,6 +21,8 @@ BOARD_BG_UPPER = np.array([180, 120, 60], dtype=np.uint8)
 
 # Minimum fraction of image area the board must occupy to be valid
 MIN_BOARD_AREA_FRACTION = 0.05
+# Morphological kernel size for noise cleanup in board detection
+BOARD_MORPH_KERNEL_SIZE = (15, 15)
 
 
 def detect_board(image: BGRImage) -> BoundingBox | None:
@@ -35,7 +37,7 @@ def detect_board(image: BGRImage) -> BoundingBox | None:
     mask = cv2.inRange(hsv, BOARD_BG_LOWER, BOARD_BG_UPPER)
 
     # Clean up noise with morphological operations
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, BOARD_MORPH_KERNEL_SIZE)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 

@@ -23,6 +23,8 @@ CARD_BG_UPPER = np.array([180, 100, 200], dtype=np.uint8)
 # Minimum card dimensions as fraction of board dimensions
 MIN_CARD_WIDTH_FRACTION = 0.15
 MIN_CARD_HEIGHT_FRACTION = 0.05
+# Morphological kernel size for noise cleanup in card detection
+CARD_MORPH_KERNEL_SIZE = (5, 5)
 
 
 def find_assignment_cards(
@@ -43,7 +45,7 @@ def find_assignment_cards(
     mask = cv2.inRange(hsv, CARD_BG_LOWER, CARD_BG_UPPER)
 
     # Clean up the mask
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, CARD_MORPH_KERNEL_SIZE)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 

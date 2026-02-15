@@ -54,6 +54,7 @@ def read_board_from_image(image: BGRImage) -> BoardState:
 
     # Step 3: Extract assignment data from each card
     assignments: list[Assignment] = []
+    errors: list[str] = []
     for i, box in enumerate(card_boxes):
         card_image = crop_region(board_image, box)
         try:
@@ -61,6 +62,8 @@ def read_board_from_image(image: BGRImage) -> BoardState:
             assignments.append(assignment)
             logger.debug("Card %d: %s", i, assignment.name)
         except Exception:
-            logger.exception("Failed to extract assignment from card %d", i)
+            msg = f"Failed to extract assignment from card {i}"
+            logger.exception(msg)
+            errors.append(msg)
 
-    return BoardState(assignments=assignments, ships=[])
+    return BoardState(assignments=assignments, ships=[], errors=errors)
