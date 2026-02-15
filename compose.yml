@@ -1,0 +1,7 @@
+# ABOUTME: Runs the agent container, cloning the target repo.
+# ABOUTME: Requires REPO_URL and auth tokens in .env.
+
+services:
+  zora:
+    build: .
+    env_file: .env
